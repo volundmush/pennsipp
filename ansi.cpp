@@ -29,12 +29,11 @@ AnsiString::AnsiString(const char *src) : source(src), text() {
     }
 
     // String has markup. nuts.
-    int idx = NOMARKUP;
-    int pidx = NOMARKUP;
     std::vector<unsigned long> mstack;
     mstack.reserve(5);
     char tag = 0;
-    unsigned long state = 0, pos = 0;
+    unsigned long state = 0, pos = 0, index = 0;
+    markup.emplace_back(0, 0, 0, 0, 'z');
 
     for(auto s: source) {
         switch(state) {
@@ -43,6 +42,7 @@ AnsiString::AnsiString(const char *src) : source(src), text() {
                     state = 1;
                 } else {
                     text.push_back(s);
+                    idx.push_back(index);
                     pos++;
                 }
                 break;
@@ -57,8 +57,13 @@ AnsiString::AnsiString(const char *src) : source(src), text() {
                 } else {
                     state = 3;
                     // This is an opening tag!
-                    markup.emplace_back(markup.size(), mstack.back(), pos, mstack.size(), tag);
-                    mstack.push_back(markup.size()-1);
+                    if(mstack.size()) {
+                        markup.emplace_back(markup.size(), mstack.back(), pos, mstack.size()-1, tag);
+                    } else {
+                        markup.emplace_back(markup.size(), 0, pos, mstack.size()-1, tag);
+                    }
+                    index = markup.size()-1;
+                    mstack.push_back(index);
                     markup[mstack.back()].start_text.push_back(s);
                 }
                 break;
@@ -72,7 +77,9 @@ AnsiString::AnsiString(const char *src) : source(src), text() {
             case 4: // we are inside a closing tag, gathering text. continue until TAG_END.
                 if(s == TAG_END) {
                     // pop up a depth level.
-                    markup[mstack.back()].end = pos;
+                    auto m = markup[mstack.back()];
+                    m.end = pos;
+                    index = m.parentIdx;
                     mstack.pop_back();
                     state = 0;
                 } else {
@@ -88,4 +95,9 @@ AnsiString::AnsiString(const char *src) : source(src), text() {
     for(auto i = mstack.rbegin(); i != mstack.rend(); ++i) {
         markup[*i].auto_close(pos);
     }
+}
+
+void AnsiString::reverse() {
+    std::reverse(text.begin(), text.end());
+    std::reverse(idx.begin(), idx.end());
 }

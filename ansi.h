@@ -93,19 +93,11 @@
 
 #define NOMARKUP (-1) /**< Character has no markup */
 
-#define AS_OPTIMIZED 0x01  /**< If the markup has been optimized. */
-#define AS_HAS_MARKUP 0x02 /**< If the string has markup or not */
-#define AS_HAS_TAGS 0x04   /**< If the string has non-color tags. */
-/** \verbatim
- * If the string has standalone tags (<IMG>, etc)
- * \endverbatim
- */
-#define AS_HAS_STANDALONE 0x08
-
 class AnsiMarkup {
 public:
     unsigned long idx = 0, parentIdx = 0, start = 0, end = 0, depth = 0;
     char type = 0;
+    bool standalone = false;
     std::string start_text, end_text;
     AnsiMarkup(unsigned long in_idx, unsigned long in_parent, unsigned long in_start, unsigned long in_depth, char in_type);
     void auto_close(unsigned long pos);
@@ -117,11 +109,11 @@ public:
     std::string text, source;
     unsigned int flags;
     std::vector<AnsiMarkup> markup;
+    std::vector<unsigned long> idx;
 
     AnsiString(const char *src);
-
     static bool has_markup(std::string *str);
-
+    void reverse();
 
 };
 
