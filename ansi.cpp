@@ -4,29 +4,88 @@
 
 #include "ansi.h"
 
-bool AnsiString::has_markup(std::string *str) {
-    return !(str->find(ESC_CHAR) == -1 && str->find(TAG_START) == -1 && str->find(TAG_END) == -1);
+AnsiMarkup::AnsiMarkup(unsigned long in_idx, unsigned long in_parent, unsigned long in_start, unsigned long in_depth, char in_type) {
+    idx = in_idx;
+    parentIdx = in_parent;
+    start = in_start;
+    type = in_type;
+    depth = in_depth;
 }
 
-AnsiString::AnsiString(const char *src) {
+void AnsiMarkup::auto_close(unsigned long pos) {
+    end = pos;
+    // TODO: Whatever auto-logic is necessary for terminating an improperly ended AnsiMarkup section.
+}
+
+bool AnsiString::has_markup(std::string *str) {
+    return str->find_first_of(MARKUP_ANY) != std::string::npos;
+}
+
+AnsiString::AnsiString(const char *src) : source(src), text() {
     // If there isn't any markup, there's no need to go further.
-    this->source.append(src);
-    if(!AnsiString::has_markup(&this->source)) {
+
+    if(!AnsiString::has_markup(&source)) {
         return;
     }
 
     // String has markup. nuts.
-    int c;
-    char *tag, type;
-
-    Markup *mi2 = nullptr, *mip = nullptr;
-
     int idx = NOMARKUP;
     int pidx = NOMARKUP;
+    std::vector<unsigned long> mstack;
+    mstack.reserve(5);
+    char tag = 0;
+    unsigned long state = 0, pos = 0;
 
-    for(auto s = const_cast<char *>(this->source.c_str()); *s;) {
-
+    for(auto s: source) {
+        switch(state) {
+            case 0: // We are not inside of a tag opener or closer.
+                if(s == TAG_START) {
+                    state = 1;
+                } else {
+                    text.push_back(s);
+                    pos++;
+                }
+                break;
+            case 1: // we encountered a TAG START... what is the tag type?
+                tag = s;
+                state = 2;
+                break;
+            case 2: // we are just inside a tag. if it begins with / this is a closing. else, opening.
+                if(s == '/') {
+                    // yup, it's closing.
+                    state = 4;
+                } else {
+                    state = 3;
+                    // This is an opening tag!
+                    markup.emplace_back(markup.size(), mstack.back(), pos, mstack.size(), tag);
+                    mstack.push_back(markup.size()-1);
+                    markup[mstack.back()].start_text.push_back(s);
+                }
+                break;
+            case 3: // we are inside an opening tag, gathering text. continue until TAG_END.
+                if(s == TAG_END) {
+                    state = 0;
+                } else {
+                    markup[mstack.back()].start_text.push_back(s);
+                }
+                break;
+            case 4: // we are inside a closing tag, gathering text. continue until TAG_END.
+                if(s == TAG_END) {
+                    // pop up a depth level.
+                    markup[mstack.back()].end = pos;
+                    mstack.pop_back();
+                    state = 0;
+                } else {
+                    markup[mstack.back()].end_text.push_back(s);
+                }
+                break;
+            default:
+                break;
+        }
     }
 
-
+    // We have finished iterating over the provided string. check for unclosed tags!
+    for(auto i = mstack.rbegin(); i != mstack.rend(); ++i) {
+        markup[*i].auto_close(pos);
+    }
 }

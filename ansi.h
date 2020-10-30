@@ -5,7 +5,7 @@
 #ifndef PENNSIPP_ANSI_H
 #define PENNSIPP_ANSI_H
 
-#include <list>
+#include <vector>
 #include <string>
 
 #define BEEP_CHAR '\a'
@@ -17,6 +17,8 @@
 #define TAG_END '\003'
 #define MARKUP_START "\002"
 #define MARKUP_END "\003"
+
+#define MARKUP_ANY "\x1b\002\003"
 
 #define ANSI_HILITE MARKUP_START "ch" MARKUP_END
 #define ANSI_INVERSE MARKUP_START "ci" MARKUP_END
@@ -100,13 +102,13 @@
  */
 #define AS_HAS_STANDALONE 0x08
 
-class Markup {
+class AnsiMarkup {
 public:
-    int parentIdx, start;
-    char type;
-    char standalone;
-    const char *start_code, *end_code;
-    unsigned int idx;
+    unsigned long idx = 0, parentIdx = 0, start = 0, end = 0, depth = 0;
+    char type = 0;
+    std::string start_text, end_text;
+    AnsiMarkup(unsigned long in_idx, unsigned long in_parent, unsigned long in_start, unsigned long in_depth, char in_type);
+    void auto_close(unsigned long pos);
 };
 
 
@@ -114,8 +116,7 @@ class AnsiString {
 public:
     std::string text, source;
     unsigned int flags;
-    std::list<unsigned int> markup;
-    std::list<Markup> mi;
+    std::vector<AnsiMarkup> markup;
 
     AnsiString(const char *src);
 
